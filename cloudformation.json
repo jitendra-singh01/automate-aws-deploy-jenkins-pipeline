@@ -1,0 +1,41 @@
+{
+ "Resources" :
+    {
+    "TomCat":{
+
+      "Type": "AWS::EC2::Instance",
+         "Properties":{
+	 "Tags" : [
+   {
+      "Key" : "Name",
+      "Value" : "tomcatwebserver"
+   },
+   {
+      "Key" : "keyname2",
+      "Value" : "value2"
+   }
+],
+         "ImageId" : "ami-02da3a138888ced85",
+         "KeyName" : "test1234",
+         "InstanceType":"t2.micro",
+         "SecurityGroups" : [ "default" ],
+         "UserData" : {"Fn::Base64" : {"Fn::Join" : ["", [
+           "#!/bin/bash\n",
+           "# Launching Instance",
+           "sudo su \n",
+           "sudo yum update -y \n",
+           "sudo yum install tomcat -y \n",
+           "echo JAVA_OPTS=-Djava.security.egd=file:/dev/./urandom -Djava.awt.headless=true -Xmx512m -XX:MaxPermSize=256m -XX:+UseConcMarkSweepGC >> /usr/share/tomcat/conf/tomcat.conf \n",
+           "yum install tomcat-webapps tomcat-admin-webapps -y \n",
+           "useradd admin \n",
+           "echo 'password' passwd --stdin admin \n",
+	   "sudo rm -rf /usr/share/tomcat/conf/tomcat-users.xml \n",
+	   "sudo touch /usr/share/tomcat/conf/tomcat-users.xml \n",
+           "echo \"<?xml version='1.0' encoding='utf-8'?><tomcat-users><user username='admin' password='password' roles='admin,manager,admin-gui,admin-script,manager-gui,manager-script,manager-jmx,manager-status' /></tomcat-users>\" >> /usr/share/tomcat/conf/tomcat-users.xml \n",
+           "sudo systemctl start tomcat \n",
+           "sudo systemctl enable tomcat \n"
+         ] ] } }
+        }
+    }
+ }
+} 

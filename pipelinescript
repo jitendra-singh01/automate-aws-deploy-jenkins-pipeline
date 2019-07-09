@@ -1,0 +1,77 @@
+def sendMail(mailto,from,mailsubject,content) {
+    mail bcc: '', body: content, cc: '', from: from, replyTo: '', subject: mailsubject, to: mailto
+}
+
+def is_test_done1 = false
+def is_test_done2 = false
+node {
+    try{
+       properties([buildDiscarder(logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '10', numToKeepStr: '10'))])
+  stage('Testing') {
+     
+      try{
+          
+        parallel (
+                'A' : {
+                retry(1) {
+                    try {
+                      build 'TestWebMavenSlave1'  
+                       is_test_done1 = true
+                    }
+                    catch (error) {
+                        // Mark branch as failed somewhere
+                          sendMail('info@itlearn360.com','info@itlearn360.com','Job failed',error.getMessage())
+                        is_test_done1 = false
+                    }
+                    }
+                },
+                'B' : {
+                retry(1) {
+                    try {                  
+                      build 'TestWebMavenSlave2'
+                      is_test_done2 = true
+                    }
+                    catch (error) {
+                        // Mark branch as failed somewhere
+                        sendMail('info@itlearn360.com','info@itlearn360.com','Job failed',error.getMessage())
+                        is_test_done2 = false
+                    }
+                    }
+                }
+            )
+      }catch (error) {
+       sendMail('info@itlearn360.com','info@itlearn360.com','Job failed',error.getMessage())
+       is_test_done1 = false
+       is_test_done2 = false
+    }
+  }
+
+  stage('Deployment') {
+      try{
+        if(is_test_done1  == true && is_test_done2  == true){
+        build "LaunchConfigureAWSInstance"
+        retry(2){    
+          echo "putting on sleep mode"
+          sleep time: 10000, unit: 'MILLISECONDS'
+          echo "started"
+          def ip = sh(script:"aws ec2 describe-instances --filters 'Name=tag:Name,Values=tomcatwebserver' 'Name=instance-state-name,Values=running' --output text --query 'Reservations[*].Instances[*].PublicIpAddress'", returnStdout:true)
+          ip = "${ip}".trim()
+          def deployname = "pmf"
+          build job:"DeplyWebMasterJob", parameters: [[$class: 'StringParameterValue', name: 'PUBLICIP', value: "http://"+"${ip}:8080"],[$class: 'StringParameterValue', name: 'APPNAME', value: "${deployname}"]],wait: true
+          sendMail('info@itlearn360.com','info@itlearn360.com','Deployment done',"Deployment done at http://"+"${ip}:8080/"+"${deployname}")
+        }
+        }else{
+          throw new Exception("Deployment failed")
+        }
+      }catch (error) {
+       sendMail('info@itlearn360.com','info@itlearn360.com','Deployment failed',error.getMessage())
+      throw new Exception("Deployment failed")
+    }
+  }
+    }
+    catch (error) {
+    println (error)
+
+}
+
+}
